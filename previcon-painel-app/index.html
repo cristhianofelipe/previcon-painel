@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PREVICON — Painel de Carteira</title>
+<meta name="description" content="Painel público de rentabilidade da carteira PREVICON">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#14324B">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PREVICON">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --azul: #14324B;
+    --azul-claro: #2C5F86;
+    --verde: #2F7A54;
+    --vermelho: #A23E32;
+    --dourado: #B8902E;
+    --bg: #F4F6F8;
+    --panel: #FFFFFF;
+    --text: #14202B;
+    --muted: #5B6B78;
+    --hairline: #D8DEE3;
+  }
+  *{ box-sizing: border-box; }
+  body{
+    margin:0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-feature-settings: "tnum" 1, "lnum" 1;
+  }
+  .wrap{ max-width: 1180px; margin: 0 auto; }
+
+  header.hero{
+    background: linear-gradient(160deg, var(--azul) 0%, #0D2436 100%);
+    color: #EAF0F4;
+    padding: 40px 32px 34px;
+  }
+  .hero-top{
+    display:flex; justify-content:space-between; align-items:flex-start; gap:20px; flex-wrap:wrap;
+  }
+  .brand{
+    font-family:'Source Serif 4', serif;
+    font-weight:600;
+    font-size: 1.05rem;
+    letter-spacing: 0.01em;
+    color: #C9D6DE;
+  }
+  .brand strong{ color:#fff; font-weight:700; }
+  .hero-actions{ display:flex; align-items:center; gap:10px; }
+  button.ghost{
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.28);
+    color: #EAF0F4;
+    padding: 7px 14px;
+    border-radius: 5px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 0.82rem;
+    cursor: pointer;
+    display:flex; align-items:center; gap:7px;
+  }
+  button.ghost:hover{ background: rgba(255,255,255,0.16); }
+  .spin{ animation: spin 0.9s linear infinite; }
+  @keyframes spin{ to{ transform: rotate(360deg); } }
+
+  .hero-figure{ margin-top: 30px; display:flex; align-items:flex-end; gap: 46px; flex-wrap: wrap; }
+  .hero-number-label{ font-size: 0.85rem; color:#9FB3C0; margin-bottom: 6px; }
+  .hero-number{
+    font-family:'Source Serif 4', serif;
+    font-weight: 600;
+    font-size: 3.1rem;
+    line-height: 1;
+    letter-spacing: -0.01em;
+  }
+  .hero-stats{ display:flex; gap: 38px; flex-wrap: wrap; padding-bottom: 5px; }
+  .hero-stat-label{ font-size: 0.78rem; color:#9FB3C0; margin-bottom:4px; }
+  .hero-stat-value{ font-size: 1.5rem; font-weight:600; }
+  .up{ color:#7FD6A6; } .down{ color:#E8A99C; }
+
+  main{ padding: 30px 32px 60px; }
+
+  .meta-bar{
+    background: var(--panel);
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+    padding: 18px 22px;
+    display:flex; align-items:center; justify-content: space-between; gap: 24px; flex-wrap: wrap;
+    margin-bottom: 26px;
+  }
+  .meta-label{ font-size: 0.86rem; color: var(--muted); }
+  .meta-label b{ color: var(--text); font-weight:600; }
+  .gap-track{ flex:1; min-width: 220px; height: 8px; background:#EDF1F3; border-radius: 4px; position:relative; }
+  .gap-fill{ position:absolute; left:0; top:0; height:100%; border-radius:4px; background: var(--verde); }
+  .gap-target{ position:absolute; top:-4px; width:2px; height:16px; background: var(--dourado); }
+  .gap-value{ font-weight:600; font-size:0.95rem; white-space:nowrap; }
+
+  section{ margin-bottom: 40px; }
+  .section-head{
+    display:flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px; gap: 12px; flex-wrap: wrap;
+  }
+  h2{
+    font-family:'Source Serif 4', serif;
+    font-weight:600;
+    font-size: 1.3rem;
+    margin: 0;
+  }
+  .section-sub{ font-size:0.83rem; color: var(--muted); }
+
+  .split{ display:grid; grid-template-columns: 1.55fr 1fr; gap: 26px; align-items:start; }
+  @media (max-width: 860px){ .split{ grid-template-columns: 1fr; } }
+
+  .panel{
+    background: var(--panel);
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+    overflow:hidden;
+  }
+
+  table{ width:100%; border-collapse: collapse; font-size: 0.87rem; }
+  thead th{
+    text-align:left;
+    font-weight:500;
+    color: var(--muted);
+    font-size: 0.75rem;
+    padding: 12px 16px 10px;
+    border-bottom: 1px solid var(--hairline);
+    cursor:pointer;
+    white-space: nowrap;
+  }
+  thead th.num, td.num{ text-align:right; }
+  thead th:hover{ color: var(--text); }
+  tbody td{ padding: 10px 16px; border-bottom: 1px solid #EEF1F3; }
+  tbody tr:last-child td{ border-bottom:none; }
+  tbody tr:hover{ background: #FAFBFC; }
+  .fund-name{ font-weight:500; }
+  .fund-seg{ font-size:0.75rem; color: var(--muted); }
+  .pill{
+    display:inline-block; font-size: 0.72rem; padding: 2px 8px; border-radius: 3px;
+    background:#EEF3F0; color: var(--verde); font-weight:500;
+  }
+  .table-scroll{ max-height: 480px; overflow-y:auto; }
+
+  .legend-row{ display:flex; align-items:center; gap:9px; padding: 9px 18px; font-size:0.85rem; }
+  .legend-row + .legend-row{ border-top: 1px solid #EEF1F3; }
+  .swatch{ width:10px; height:10px; border-radius:2px; flex-shrink:0; }
+  .legend-val{ margin-left:auto; font-weight:600; color: var(--muted); }
+  #donutWrap{ padding: 22px 18px 6px; }
+
+  .bench-panel{ padding: 22px; }
+  .bench-row{ margin-bottom: 16px; }
+  .bench-row:last-child{ margin-bottom:0; }
+  .bench-label{ display:flex; justify-content:space-between; font-size:0.85rem; margin-bottom:6px; }
+  .bench-track{ height:7px; background:#EDF1F3; border-radius:4px; overflow:hidden; }
+  .bench-fill{ height:100%; border-radius:4px; }
+
+  footer{
+    padding: 18px 32px 40px;
+    display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;
+    font-size: 0.78rem; color: var(--muted);
+  }
+  .src-form{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .src-form input{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    padding: 6px 10px;
+    border:1px solid var(--hairline);
+    border-radius:4px;
+    width: 300px;
+    color: var(--text);
+    background:#fff;
+  }
+  .src-form button{
+    font-family:'IBM Plex Sans', sans-serif;
+    font-size:0.78rem;
+    padding:6px 12px;
+    border-radius:4px;
+    border:1px solid var(--azul-claro);
+    background: var(--azul-claro);
+    color:#fff;
+    cursor:pointer;
+  }
+  .status-dot{ width:7px; height:7px; border-radius:50%; display:inline-block; margin-right:6px; }
+  .status-ok{ background: var(--verde); }
+  .status-warn{ background: var(--dourado); }
+  .status-err{ background: var(--vermelho); }
+
+
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="hero-top">
+      <div class="brand"><strong>PREVICON</strong> — Regime Próprio de Previdência Social · Confresa/MT</div>
+      <div class="hero-actions">
+        <button class="ghost" id="refreshBtn" onclick="checkForUpdate()">
+          <span id="refreshIcon">↻</span> Verificar atualização
+        </button>
+      </div>
+    </div>
+    <div class="hero-figure">
+      <div>
+        <div class="hero-number-label">Patrimônio total da carteira</div>
+        <div class="hero-number" id="totalPatrimonio">—</div>
+      </div>
+      <div class="hero-stats">
+        <div>
+          <div class="hero-stat-label">Rentabilidade média do mês</div>
+          <div class="hero-stat-value" id="rentMes">—</div>
+        </div>
+        <div>
+          <div class="hero-stat-label">Rentabilidade acum. 12 meses</div>
+          <div class="hero-stat-value" id="rent12m">—</div>
+        </div>
+        <div>
+          <div class="hero-stat-label">Posição em</div>
+          <div class="hero-stat-value" id="dataRef" style="font-size:1.2rem; font-weight:500;">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="meta-bar">
+    <div class="meta-label">Meta atuarial do mês: <b id="metaVal">—</b></div>
+    <div class="gap-track">
+      <div class="gap-fill" id="gapFill"></div>
+      <div class="gap-target" id="gapTarget"></div>
+    </div>
+    <div class="gap-value" id="gapValue">—</div>
+  </div>
+
+  <section>
+    <div class="section-head">
+      <h2>Carteira por fundo</h2>
+      <div class="section-sub">Clique nos cabeçalhos para ordenar</div>
+    </div>
+    <div class="split">
+      <div class="panel">
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th data-key="Fundo">Fundo</th>
+                <th class="num" data-key="Rentabilidade_Mes_pct">Rent. mês</th>
+                <th class="num" data-key="Rentabilidade_Acum_12m_pct">Rent. 12m</th>
+                <th class="num" data-key="Patrimonio_R$">Patrimônio</th>
+              </tr>
+            </thead>
+            <tbody id="fundTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="panel">
+        <div id="donutWrap">
+          <canvas id="donutChart" height="200"></canvas>
+        </div>
+        <div id="segLegend"></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Instituições e segmentos</h2>
+      <div class="section-sub">Participação no patrimônio total</div>
+    </div>
+    <div class="panel bench-panel" id="benchPanel"></div>
+  </section>
+
+</main>
+
+<footer>
+  <div>
+    <span class="status-dot" id="statusDot"></span><span id="statusText">carregando…</span>
+  </div>
+  <div>PREVICON — dados atualizados pela rotina semanal · <span id="footerRef"></span></div>
+</footer>
+
+<script>
+// =====================================================================
+// DADOS DO PAINEL — bloco reescrito pela rotina semanal PREVICON.
+// A automação (tarefa Programada do projeto "Rentabilidade - Carteira
+// PREVICON") deve substituir o conteúdo entre PAINEL_DATA_INICIO e
+// PAINEL_DATA_FIM a cada execução, mantendo o mesmo formato CSV, e então
+// enviar (git commit + push) este arquivo para o repositório do GitHub
+// Pages. Nada mais no arquivo precisa mudar.
+// =====================================================================
+// PAINEL_DATA_INICIO
+const PAINEL_ATUALIZADO_EM = "2026-08-31"; // data da última atualização da carteira
+const PAINEL_CSV = `Data,Fundo,Rentabilidade_Mes_pct,Rentabilidade_Acum_12m_pct,Patrimonio_R$,Meta_Atuarial_pct,Segmento,Instituicao
+2026-08-31,BB Previd RF Perfil,1.11,14.79,23030610.89,0.55,Renda Fixa,BB
+2026-08-31,CAIXA FI Brasil IRF-M1 TP RF,1.14,14.3,19038031.08,0.55,Renda Fixa,CEF
+2026-08-31,BB PREVID RF IRF-M,1.03,11.71,18063443.96,0.55,Renda Fixa,BB
+2026-08-31,BB RF Ref DI TP FIF,1.1,14.6,14035786.93,0.55,Renda Fixa,BB
+2026-08-31,PREVID RF IMA-B 5,1.29,13.06,12271372.61,0.55,Renda Fixa,BB
+2026-08-31,RF LP Corp Bancos,1.13,14.8,10349715.68,0.55,Renda Fixa,BB
+2026-08-31,CAIXA FI Brasil IMA-B TP RF LP,1.57,10.74,9159787.87,0.55,Renda Fixa,CEF
+2026-08-31,CAIXA FI Brasil IDKA IPCA 2A RF LP,1.45,13.01,7615648.81,0.55,Renda Fixa,CEF
+2026-08-31,BB PREVID RF IDKA 2,1.38,13.06,6752544.00,0.55,Renda Fixa,BB
+2026-08-31,FI Caixa Topázio Corporativo RF Ref,1.1,14.66,6484583.63,0.55,Renda Fixa,CEF
+2026-08-31,BB PREVID IMA-B TP,1.58,10.72,3657702.85,0.55,Renda Fixa,BB
+2026-08-31,CI Caixa Brasil 2027 TP RF RL,1.41,7.83,1904694.86,0.55,Renda Fixa,CEF
+2026-08-31,BB RF Fluxo Sb,1,7.25,1211555.85,0.55,Renda Fixa,BB
+2026-08-31,CAIXA FI Brasil IMA-B5+ TP RF LP,1.81,8.95,1206255.73,0.55,Renda Fixa,CEF
+2026-08-31,CI Caixa Brasil 2030 II TP RF RL,-1.92,4.46,762067.67,0.55,Renda Fixa,CEF
+2026-08-31,CI Caixa Brasil 2027 X TP RF RL,1.41,7.9,270020.49,0.55,Renda Fixa,CEF
+2026-08-31,FIA Caixa Brasil Indexa Ibovespa,-0.33,24.93,5913103.16,0.55,Renda Variável,CEF
+2026-08-31,Esp Régia Inst Eq 30,1.07,14.42,5423478.07,0.55,Renda Variável,BB
+2026-08-31,Ações Divid Midcaps,-0.07,13.72,1731483.45,0.55,Renda Variável,BB
+2026-08-31,Ações Governança,-0.01,24.13,1122547.91,0.55,Renda Variável,BB
+2026-08-31,BB Previd Vert 2027,1.41,14.48,2058893.48,0.55,Multimercado,BB
+2026-08-31,BB Previd Vert 2030,1.12,11.07,1829858.23,0.55,Multimercado,BB
+2026-08-31,CI Caixa Institucional BDR Nível I Ações RL,5.59,18.14,4625287.31,0.55,Exterior,CEF
+2026-08-31,Ações Globais Ativo,3.25,34.84,1252390.73,0.55,Exterior,BB
+`;
+// PAINEL_DATA_FIM
+
+let currentData = [];
+let sortKey = 'Patrimonio_R$';
+let sortDir = -1;
+let donutChart = null;
+
+function fmtBRL(n){
+  return 'R$ ' + n.toLocaleString('pt-BR', {maximumFractionDigits:0});
+}
+function fmtBRLcompact(n){
+  if(n >= 1e6) return 'R$ ' + (n/1e6).toLocaleString('pt-BR', {maximumFractionDigits:1}) + ' mi';
+  return fmtBRL(n);
+}
+function fmtPct(n, signed){
+  const s = (signed && n > 0 ? '+' : '') + n.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}) + '%';
+  return s;
+}
+
+function setStatus(kind, text){
+  const dot = document.getElementById('statusDot');
+  dot.className = 'status-dot status-' + kind;
+  document.getElementById('statusText').textContent = text;
+}
+
+function parseCSV(text){
+  const parsed = Papa.parse(text.trim(), {header:true, skipEmptyLines:true});
+  return parsed.data
+    .filter(r => r.Fundo && r['Patrimonio_R$'])
+    .map(r => ({
+      Data: r.Data,
+      Fundo: r.Fundo,
+      Rentabilidade_Mes_pct: parseFloat(r.Rentabilidade_Mes_pct) || 0,
+      Rentabilidade_Acum_12m_pct: parseFloat(r.Rentabilidade_Acum_12m_pct) || 0,
+      'Patrimonio_R$': parseFloat(r['Patrimonio_R$']) || 0,
+      Meta_Atuarial_pct: parseFloat(r.Meta_Atuarial_pct) || 0.55,
+      Segmento: r.Segmento || 'Outros',
+      Instituicao: r.Instituicao || '—'
+    }));
+}
+
+function loadData(){
+  currentData = parseCSV(PAINEL_CSV);
+  document.getElementById('footerRef').textContent = 'última posição: ' + PAINEL_ATUALIZADO_EM;
+  setStatus('ok', 'painel oficial PREVICON · dados de ' + PAINEL_ATUALIZADO_EM);
+  render();
+}
+
+// Verifica se existe uma versão mais nova deste arquivo publicada no site
+// (força o navegador a ignorar cache e buscar o index.html mais recente).
+async function checkForUpdate(){
+  const icon = document.getElementById('refreshIcon');
+  icon.classList.add('spin');
+  try{
+    const res = await fetch(location.pathname + '?t=' + Date.now(), {cache:'no-store'});
+    const text = await res.text();
+    const match = text.match(/PAINEL_ATUALIZADO_EM = "([^"]+)"/);
+    if(match && match[1] !== PAINEL_ATUALIZADO_EM){
+      setStatus('warn', 'nova posição disponível (' + match[1] + ') — atualizando…');
+      location.reload();
+      return;
+    }
+    setStatus('ok', 'painel já está na versão mais recente (' + PAINEL_ATUALIZADO_EM + ')');
+  }catch(err){
+    setStatus('err', 'sem conexão — mostrando última versão salva no aparelho');
+  }
+  icon.classList.remove('spin');
+}
+
+function render(){
+  if(currentData.length === 0) return;
+
+  const totalPatrimonio = currentData.reduce((s,r)=> s + r['Patrimonio_R$'], 0);
+  const wRentMes = currentData.reduce((s,r)=> s + r.Rentabilidade_Mes_pct * r['Patrimonio_R$'], 0) / totalPatrimonio;
+  const wRent12m = currentData.reduce((s,r)=> s + r.Rentabilidade_Acum_12m_pct * r['Patrimonio_R$'], 0) / totalPatrimonio;
+  const meta = currentData[0].Meta_Atuarial_pct;
+  const gap = wRentMes - meta;
+
+  document.getElementById('totalPatrimonio').textContent = fmtBRLcompact(totalPatrimonio);
+  document.getElementById('rentMes').textContent = fmtPct(wRentMes, true);
+  document.getElementById('rentMes').className = 'hero-stat-value ' + (wRentMes >= 0 ? 'up' : 'down');
+  document.getElementById('rent12m').textContent = fmtPct(wRent12m, true);
+  document.getElementById('rent12m').className = 'hero-stat-value ' + (wRent12m >= 0 ? 'up' : 'down');
+  document.getElementById('dataRef').textContent = currentData[0].Data;
+
+  document.getElementById('metaVal').textContent = fmtPct(meta, false) + ' ao mês';
+  const gapPct = Math.min(100, Math.max(0, (wRentMes / (meta*2)) * 100));
+  document.getElementById('gapFill').style.width = gapPct + '%';
+  document.getElementById('gapFill').style.background = gap >= 0 ? 'var(--verde)' : 'var(--vermelho)';
+  document.getElementById('gapTarget').style.left = '50%';
+  const gapEl = document.getElementById('gapValue');
+  gapEl.textContent = (gap >= 0 ? '+' : '') + gap.toFixed(2) + ' p.p. vs. meta';
+  gapEl.style.color = gap >= 0 ? 'var(--verde)' : 'var(--vermelho)';
+
+  renderTable();
+  renderDonut(totalPatrimonio);
+  renderBench(totalPatrimonio);
+}
+
+function renderTable(){
+  const rows = [...currentData].sort((a,b)=>{
+    const av = a[sortKey], bv = b[sortKey];
+    if(typeof av === 'string') return sortDir * av.localeCompare(bv);
+    return sortDir * (av - bv);
+  });
+  const body = document.getElementById('fundTableBody');
+  body.innerHTML = rows.map(r => `
+    <tr>
+      <td>
+        <div class="fund-name">${r.Fundo}</div>
+        <div class="fund-seg">${r.Segmento} · ${r.Instituicao}</div>
+      </td>
+      <td class="num" style="color:${r.Rentabilidade_Mes_pct >= 0 ? 'var(--verde)' : 'var(--vermelho)'}">${fmtPct(r.Rentabilidade_Mes_pct, true)}</td>
+      <td class="num" style="color:${r.Rentabilidade_Acum_12m_pct >= 0 ? 'var(--verde)' : 'var(--vermelho)'}">${fmtPct(r.Rentabilidade_Acum_12m_pct, true)}</td>
+      <td class="num">${fmtBRL(r['Patrimonio_R$'])}</td>
+    </tr>
+  `).join('');
+}
+
+const SEG_COLORS = {
+  'Renda Fixa': '#2C5F86',
+  'Renda Variável': '#2F7A54',
+  'Multimercado': '#B8902E',
+  'Exterior': '#A23E32',
+  'Outros': '#8C9AA6'
+};
+
+function renderDonut(total){
+  const bySeg = {};
+  currentData.forEach(r => { bySeg[r.Segmento] = (bySeg[r.Segmento]||0) + r['Patrimonio_R$']; });
+  const labels = Object.keys(bySeg);
+  const values = labels.map(l => bySeg[l]);
+  const colors = labels.map(l => SEG_COLORS[l] || '#8C9AA6');
+
+  const ctx = document.getElementById('donutChart');
+  if(donutChart) donutChart.destroy();
+  donutChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data: values, backgroundColor: colors, borderWidth: 2, borderColor: '#fff' }] },
+    options: {
+      cutout: '68%',
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => c.label + ': ' + fmtBRLcompact(c.parsed) } } }
+    }
+  });
+
+  const legend = document.getElementById('segLegend');
+  legend.innerHTML = labels.map(l => `
+    <div class="legend-row">
+      <span class="swatch" style="background:${SEG_COLORS[l]||'#8C9AA6'}"></span>
+      ${l}
+      <span class="legend-val">${((bySeg[l]/total)*100).toFixed(1)}%</span>
+    </div>
+  `).join('');
+}
+
+function renderBench(total){
+  const byInst = {};
+  currentData.forEach(r => { byInst[r.Instituicao] = (byInst[r.Instituicao]||0) + r['Patrimonio_R$']; });
+  const maxV = Math.max(...Object.values(byInst));
+  const panel = document.getElementById('benchPanel');
+  panel.innerHTML = Object.entries(byInst).sort((a,b)=>b[1]-a[1]).map(([inst,val]) => `
+    <div class="bench-row">
+      <div class="bench-label"><span>${inst}</span><span>${fmtBRLcompact(val)} · ${((val/total)*100).toFixed(1)}%</span></div>
+      <div class="bench-track"><div class="bench-fill" style="width:${(val/maxV)*100}%; background:var(--azul-claro);"></div></div>
+    </div>
+  `).join('');
+}
+
+document.querySelectorAll('thead th').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.key;
+    if(sortKey === key) sortDir *= -1; else { sortKey = key; sortDir = -1; }
+    renderTable();
+  });
+});
+
+loadData();
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
+</script>
+
+</body>
+</html>
